@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Upload Media</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+
+<body>
+  <h1>Upload Media</h1>
+  <form action="/upload" method="post" enctype="multipart/form-data">
+    <input type="file" name="media" accept="image/*,video/*" multiple>
+    <button type="submit">Upload</button>
+  </form>
+  <p><a href="/gallery">View Gallery</a> | <a href="/logout">Logout</a></p>
+</body>
+
+</html>
