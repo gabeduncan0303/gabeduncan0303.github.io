@@ -1,109 +1,30 @@
-# Private Gallery (GitHub Pages + Supabase)
+# Private Gallery (GitHub Pages frontend + Cloudflare Worker backend)
 
-This is a static React site designed to be hosted on GitHub Pages. It uses Supabase for:
-- User accounts (Auth)
-- Private media storage (Storage bucket)
-- Media metadata (Postgres table with RLS)
+This repo is split into:
+- `frontend/` static site (deploy to GitHub Pages)
+- `worker/` Cloudflare Worker API (auth + uploads + private media)
 
-## 1) Create Supabase project
-Create a project in Supabase, then copy:
-- Project URL
-- Anon public key
+## 1) Deploy backend (Cloudflare)
+1. Install Wrangler: `npm i -g wrangler`
+2. In `worker/`:
+   - Create D1: `wrangler d1 create private_gallery`
+   - Create R2: `wrangler r2 bucket create private-gallery-media`
+   - Put the D1 `database_id` into `worker/wrangler.toml`
+   - Set `FRONTEND_ORIGIN` to your GitHub Pages origin
+   - Apply schema: `wrangler d1 execute private_gallery --file=./schema.sql`
+   - Deploy: `wrangler deploy`
+3. Note your API base URL:
+   `https://private-gallery-api.<your-subdomain>.workers.dev`
 
-## 2) Create a private Storage bucket
-Name it `private-media` (or any name you set in `VITE_SUPABASE_BUCKET`).
-Set bucket visibility to **private**.
-
-## 3) Create the `media` table
-Run this in Supabase SQL editor:
-
-```sql
-create table if not exists public.media (
-  id uuid primary key default gen_random_uuid(),
-  owner_id uuid not null references auth.users(id) on delete cascade,
-  storage_path text not null,
-  mime_type text not null,
-  original_name text not null,
-  size_bytes bigint not null,
-  created_at timestamptz not null default now()
-);
-
-alter table public.media enable row level security;
-
-create policy "media_select_own"
-on public.media for select
-using (auth.uid() = owner_id);
-
-create policy "media_insert_own"
-on public.media for insert
-with check (auth.uid() = owner_id);
-
-create policy "media_delete_own"
-on public.media for delete
-using (auth.uid() = owner_id);
-```
-
-## 4) Storage policies (bucket: private-media)
-Storage uses `storage.objects`. Create policies so users can manage files under their own folder: `${userId}/...`
-
-```sql
-create policy "storage_read_own"
-on storage.objects for select
-using (
-  bucket_id = 'private-media'
-  and (auth.uid()::text = (storage.foldername(name))[1])
-);
-
-create policy "storage_insert_own"
-on storage.objects for insert
-with check (
-  bucket_id = 'private-media'
-  and (auth.uid()::text = (storage.foldername(name))[1])
-);
-
-create policy "storage_delete_own"
-on storage.objects for delete
-using (
-  bucket_id = 'private-media'
-  and (auth.uid()::text = (storage.foldername(name))[1])
-);
-```
-
-If your bucket name is different, replace `'private-media'`.
-
-## 5) Configure environment variables
-Create `.env` in the project root:
-
-```
-VITE_SUPABASE_URL=...
-VITE_SUPABASE_ANON_KEY=...
-VITE_SUPABASE_BUCKET=private-media
-```
-
-## 6) Run locally
-```bash
-npm install
-npm run dev
-```
-
-## 7) Deploy to GitHub Pages
-Two common approaches:
-
-### A) Deploy from your machine
-1. Install dependencies
-2. Run:
-```bash
-npm run deploy
-```
-This pushes `dist/` to a `gh-pages` branch.
-
-In your repo settings:
-- Pages source: `gh-pages` branch / root
-
-### B) GitHub Actions (recommended)
-Use a workflow that runs `npm ci && npm run build` and publishes `dist`.
-If you want that, tell me and I’ll provide the workflow file.
+## 2) Deploy frontend (GitHub Pages)
+1. Edit `frontend/config.js` and set:
+   `API_BASE` to your Worker URL
+2. Push to a GitHub repo.
+3. Enable Pages:
+   - Settings -> Pages -> Deploy from branch
+   - Select the branch and set the folder to `/frontend`
 
 ## Notes
-- This app uses a HashRouter so deep links work on GitHub Pages.
-- Media is served via short-lived signed URLs.
+- No localStorage/cookies are used.
+- After a page refresh, users must log in again (token is kept only in memory).
+- Media is private: all downloads require a valid Bearer token and ownership check.

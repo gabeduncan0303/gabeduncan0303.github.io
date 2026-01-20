@@ -1,0 +1,15 @@
+name = "private-gallery-api"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+FRONTEND_ORIGIN = "https://YOUR_GITHUB_USERNAME.github.io"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "private_gallery"
+database_id = "YOUR_D1_DATABASE_ID"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "private-gallery-media"
